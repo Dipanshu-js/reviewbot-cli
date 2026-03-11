@@ -11,16 +11,30 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18, 20, 22]
+        node-version: [20, 22, 24]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
-          cache: npm
 
-      - run: npm ci
-      - run: npm test
+      - name: Install dependencies
+        run: npm install
+
+      - name: Syntax check
+        run: |
+          node --check bin/reviewbot.js
+          node --check src/cli/index.js
+          node --check src/cli/commands/review.js
+          node --check src/cli/commands/config.js
+          node --check src/core/diff.js
+          node --check src/core/prompt.js
+          node --check src/core/reviewer.js
+          node --check src/core/config.js
+          node --check src/github/pr.js
+
+      - name: Run tests
+        run: npm test
