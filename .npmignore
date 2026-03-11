@@ -1,3 +1,4 @@
 push.sh
 .github/
 *.log
+.DS_Store
