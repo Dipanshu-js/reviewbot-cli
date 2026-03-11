@@ -16,14 +16,14 @@
 
 ---
 
-Run `reviewbot` before `git push`. Get a streaming AI review of your diff in the terminal — bugs, warnings, suggestions — before your teammates see it.
+Run `reviewbot` before `git push`. Get a streaming AI review of your diff in the terminal — bugs, warnings, suggestions — before your teammates see it. Works with OpenAI, Anthropic, Grok, Gemini, or local Ollama.
 
 ```sh
 $ reviewbot
 
-────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────
  reviewbot · openai · gpt-4o
-────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────
 
 ## Summary
 Adds user authentication middleware and updates route handlers.
@@ -41,8 +41,8 @@ production if the env var is missing.
   const secret = process.env.JWT_SECRET;
 
 ### WARNING
-**src/routes/user.js:38** — No error handling on the `await db.findUser()`
-call. An unhandled rejection here will crash the process.
+**src/routes/user.js:38** — No error handling on `await db.findUser()`.
+An unhandled rejection here will crash the process.
 
 ### SUGGESTION
 **src/middleware/auth.js:22** — `req.user = decoded` mutates the request
@@ -51,7 +51,7 @@ object without a type definition. Consider a typed wrapper or JSDoc.
 ## What's good
 Error responses use consistent status codes throughout.
 
-────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────
 ```
 
 ---
@@ -70,61 +70,67 @@ npx reviewbot-cli
 
 ---
 
+## Setup
+
+Run the interactive setup:
+
+```sh
+reviewbot config set-key
+```
+
+```
+? Set up an AI provider API key? › Yes
+? Which provider?
+  ❯ OpenAI      (gpt-4o)
+    Anthropic   (claude-3-5-haiku)
+    Grok        (grok-beta)
+    Gemini      (gemini-1.5-flash)
+    Ollama      (local, no key needed)
+? Enter your openai API key (starts with sk-...): ****
+Saved. Run: reviewbot
+```
+
+Or set via environment variable:
+
+```sh
+export OPENAI_API_KEY=sk-...
+export ANTHROPIC_API_KEY=sk-ant-...
+export GROK_API_KEY=xai-...
+export GEMINI_API_KEY=AIza...
+```
+
+---
+
 ## Usage
 
 ```sh
-# Review current unstaged + staged diff vs main
+# Review current diff vs main
 reviewbot
 
 # Review only staged changes
 reviewbot --staged
 
-# Review diff against a specific branch
+# Review against a different branch
 reviewbot --base develop
 
 # Review only certain files
 reviewbot --files "src/**/*.ts"
 
-# Review a GitHub pull request by URL
+# Use a specific provider for this run
+reviewbot --provider grok
+reviewbot --provider gemini
+reviewbot --provider ollama --model llama3
+
+# Override the model
+reviewbot --model gpt-4-turbo
+reviewbot --model gemini-1.5-pro
+reviewbot --model claude-3-5-sonnet-20241022
+
+# Review a GitHub pull request
 reviewbot --pr https://github.com/owner/repo/pull/42
 
-# Use a different provider
-reviewbot --provider anthropic
-reviewbot --provider ollama --model llama3
-```
-
----
-
-## Setup
-
-**OpenAI (default)**
-
-```sh
-reviewbot config set-key
-# paste your key when prompted
-```
-
-Or set the environment variable:
-
-```sh
-export OPENAI_API_KEY=sk-...
-```
-
-**Anthropic**
-
-```sh
-reviewbot config set-key --provider anthropic
-# or
-export ANTHROPIC_API_KEY=sk-ant-...
-reviewbot --provider anthropic
-```
-
-**Ollama (local, no API key needed)**
-
-```sh
-# install ollama: https://ollama.com
-ollama pull llama3
-reviewbot --provider ollama
+# Disable streaming (wait for full response)
+reviewbot --no-stream
 ```
 
 ---
@@ -132,16 +138,30 @@ reviewbot --provider ollama
 ## Config
 
 ```sh
-reviewbot config show          # show current config
-reviewbot config set provider openai
-reviewbot config set model gpt-4-turbo
-reviewbot config clear
+reviewbot config show                       # show current config
+reviewbot config set-key                    # change provider / API key
+reviewbot config set provider gemini        # switch default provider
+reviewbot config set model gpt-4-turbo      # set default model
+reviewbot config clear                      # wipe everything
 ```
 
 Config is stored at:
+
 - macOS: `~/Library/Preferences/reviewbot-cli-nodejs/`
 - Linux: `~/.config/reviewbot-cli-nodejs/`
 - Windows: `%APPDATA%\reviewbot-cli-nodejs\`
+
+---
+
+## Providers
+
+| Provider    | Default model             | Key required      | Get key                                                       |
+| ----------- | ------------------------- | ----------------- | ------------------------------------------------------------- |
+| `openai`    | gpt-4o                    | Yes               | [platform.openai.com](https://platform.openai.com/api-keys)   |
+| `anthropic` | claude-3-5-haiku-20241022 | Yes               | [console.anthropic.com](https://console.anthropic.com)        |
+| `grok`      | grok-beta                 | Yes               | [console.x.ai](https://console.x.ai)                          |
+| `gemini`    | gemini-1.5-flash          | Yes               | [aistudio.google.com](https://aistudio.google.com/app/apikey) |
+| `ollama`    | llama3                    | No — runs locally | [ollama.com](https://ollama.com)                              |
 
 ---
 
@@ -172,29 +192,19 @@ jobs:
 
 ---
 
-## Providers
-
-| Provider | Models | Key required |
-|---|---|---|
-| `openai` | gpt-4o, gpt-4-turbo, gpt-3.5-turbo | Yes — [platform.openai.com](https://platform.openai.com) |
-| `anthropic` | claude-3-5-haiku, claude-3-5-sonnet | Yes — [console.anthropic.com](https://console.anthropic.com) |
-| `ollama` | llama3, mistral, codellama, any local | No — runs locally |
-
----
-
 ## How it works
 
 ```
 git diff (or PR diff via GitHub API)
     │
     ▼
-diff parser + truncation (fits in context window)
+diff parser + glob filter + truncation (fits in context window)
     │
     ▼
-prompt builder (system: senior engineer persona + structured output format)
+prompt builder (CRITICAL / WARNING / SUGGESTION / NITPICK)
     │
     ▼
-AI provider (OpenAI / Anthropic / Ollama) — streaming
+AI provider (OpenAI / Anthropic / Grok / Gemini / Ollama) — streaming
     │
     ▼
 markdown renderer (CRITICAL in red, WARNING in yellow, terminal-friendly)
@@ -204,11 +214,10 @@ markdown renderer (CRITICAL in red, WARNING in yellow, terminal-friendly)
 
 ## Contributing
 
-Issues and PRs are welcome. Before opening a PR:
+Issues and PRs welcome. Before opening a PR:
 
 ```sh
-npm test     # must pass
-npm run lint # must pass
+npm test
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
